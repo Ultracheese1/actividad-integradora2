@@ -4,6 +4,7 @@
 #include <fstream>
 #include <queue>
 #include <limits>
+#include <cmath>
 
 using namespace std;
 
@@ -27,6 +28,16 @@ struct SolucionTSP {
     int distanciaTotal;
     int saltoMaximo;
     vector<int> ruta;
+};
+
+struct Punto {
+    double x, y;
+};
+
+struct SolucionCentrales {
+    double distPromedio;
+    double distMaxima;
+    vector<int> centralesActivas;
 };
 
 /* =========================================================
@@ -58,14 +69,9 @@ struct UnionFind {
 
 /* =========================================================
    =====================  PARTE 2.1 ========================
-   ============  MST MULTIOBJETIVO (KRUSKAL) ===============
    ========================================================= */
 
-SolucionMST kruskalConLimite(
-    int N,
-    const vector<Edge>& edges,
-    int maxTramo
-) {
+SolucionMST kruskalConLimite(int N, const vector<Edge>& edges, int maxTramo) {
     vector<Edge> candidatas;
     for (const auto& e : edges)
         if (e.w <= maxTramo)
@@ -115,29 +121,21 @@ vector<SolucionMST> filtrarParetoMST(vector<SolucionMST>& sols) {
     return pareto;
 }
 
-vector<SolucionMST> eliminarDuplicadosMST(
-    const vector<SolucionMST>& sols
-) {
+vector<SolucionMST> eliminarDuplicadosMST(const vector<SolucionMST>& sols) {
     vector<SolucionMST> unicas;
-
     for (const auto& s : sols) {
         bool repetida = false;
-        for (const auto& u : unicas) {
+        for (const auto& u : unicas)
             if (s.distanciaTotal == u.distanciaTotal &&
-                s.tramoMaximo == u.tramoMaximo) {
+                s.tramoMaximo == u.tramoMaximo)
                 repetida = true;
-                break;
-            }
-        }
-        if (!repetida)
-            unicas.push_back(s);
+        if (!repetida) unicas.push_back(s);
     }
     return unicas;
 }
 
 /* =========================================================
    =====================  PARTE 2.2 ========================
-   ============  TSP MULTIOBJETIVO (BACKTRACK) =============
    ========================================================= */
 
 void backtrackingTSP(
@@ -178,11 +176,9 @@ void backtrackingTSP(
             visitado[i] = true;
             rutaActual.push_back(i);
 
-            backtrackingTSP(
-                mat, eps, visitado, rutaActual,
-                nivel + 1, nuevoCosto,
-                max(saltoMax, w), mejor
-            );
+            backtrackingTSP(mat, eps, visitado, rutaActual,
+                            nivel + 1, nuevoCosto,
+                            max(saltoMax, w), mejor);
 
             rutaActual.pop_back();
             visitado[i] = false;
@@ -212,45 +208,11 @@ vector<SolucionTSP> filtrarParetoTSP(vector<SolucionTSP>& sols) {
     return pareto;
 }
 
-bool rutasIguales(const vector<int>& a, const vector<int>& b) {
-    if (a.size() != b.size()) return false;
-    for (int i = 0; i < a.size(); i++)
-        if (a[i] != b[i]) return false;
-    return true;
-}
-
-vector<SolucionTSP> eliminarDuplicadosTSP(
-    const vector<SolucionTSP>& sols
-) {
-    vector<SolucionTSP> unicas;
-
-    for (const auto& s : sols) {
-        bool repetida = false;
-        for (const auto& u : unicas) {
-            if (s.distanciaTotal == u.distanciaTotal &&
-                s.saltoMaximo == u.saltoMaximo &&
-                rutasIguales(s.ruta, u.ruta)) {
-                repetida = true;
-                break;
-            }
-        }
-        if (!repetida)
-            unicas.push_back(s);
-    }
-    return unicas;
-}
-
 /* =========================================================
    =====================  PARTE 2.3 ========================
-   ===============  FLUJO MAXIMO (EK) ======================
    ========================================================= */
 
-int maxFlowEdmondsKarp(
-    int N,
-    vector<vector<int>> cap,
-    int s,
-    int t
-) {
+int maxFlowEdmondsKarp(int N, vector<vector<int>> cap, int s, int t) {
     int flujoMax = 0;
 
     while (true) {
@@ -287,15 +249,56 @@ int maxFlowEdmondsKarp(
 }
 
 /* =========================================================
+   =====================  PARTE 2.4 ========================
+   ====== CENTRALES Y CERCANÍA GEOGRÁFICA (PARETO) =========
+   ========================================================= */
+
+double distancia(const Punto& a, const Punto& b) {
+    double dx = a.x - b.x;
+    double dy = a.y - b.y;
+    return sqrt(dx * dx + dy * dy);
+}
+
+SolucionCentrales evaluarCentrales(
+    const vector<Punto>& colonias,
+    const vector<Punto>& centrales,
+    const vector<int>& activas
+) {
+    double suma = 0.0;
+    double maxDist = 0.0;
+
+    for (const auto& col : colonias) {
+        double mejor = 1e18;
+        for (int idx : activas)
+            mejor = min(mejor, distancia(col, centrales[idx]));
+
+        suma += mejor;
+        maxDist = max(maxDist, mejor);
+    }
+
+    return {
+        suma / colonias.size(),
+        maxDist,
+        activas
+    };
+}
+
+bool dominaCentrales(
+    const SolucionCentrales& a,
+    const SolucionCentrales& b
+) {
+    return (a.distPromedio <= b.distPromedio &&
+            a.distMaxima  <= b.distMaxima &&
+           (a.distPromedio < b.distPromedio ||
+            a.distMaxima  < b.distMaxima));
+}
+
+/* =========================================================
    ========================== MAIN =========================
    ========================================================= */
 
 int main() {
     ifstream input("entrada.txt");
-    if (!input) {
-        cerr << "Error al abrir archivo\n";
-        return 1;
-    }
 
     int N;
     input >> N;
@@ -310,79 +313,47 @@ int main() {
         for (int j = 0; j < N; j++)
             input >> cap[i][j];
 
-    char c; double x, y;
+    vector<Punto> colonias(N);
+    char c;
     for (int i = 0; i < N; i++)
-        input >> c >> x >> c >> y >> c;
+        input >> c >> colonias[i].x >> c >> colonias[i].y >> c;
+
+    int M;
+    input >> M;
+
+    vector<Punto> centrales(M);
+    for (int i = 0; i < M; i++)
+        input >> centrales[i].x >> centrales[i].y;
 
     input.close();
 
-    /* =====================  2.1 MST ===================== */
+    /* =====================  2.4 OUTPUT ===================== */
 
-    vector<Edge> edges;
-    for (int i = 0; i < N; i++)
-        for (int j = i + 1; j < N; j++)
-            if (mat[i][j] > 0)
-                edges.push_back({i, j, mat[i][j]});
+    vector<SolucionCentrales> soluciones;
 
-    vector<SolucionMST> mstCandidatas;
-    for (int eps = 10; eps <= 50; eps += 2) {
-        auto sol = kruskalConLimite(N, edges, eps);
-        if (sol.distanciaTotal < INF)
-            mstCandidatas.push_back(sol);
+    for (int mask = 1; mask < (1 << M); mask++) {
+        vector<int> activas;
+        for (int i = 0; i < M; i++)
+            if (mask & (1 << i))
+                activas.push_back(i);
+
+        soluciones.push_back(
+            evaluarCentrales(colonias, centrales, activas)
+        );
     }
 
-    auto mstUnicas = eliminarDuplicadosMST(mstCandidatas);
-    auto paretoMST = filtrarParetoMST(mstUnicas);
-
-
-    cout << "Frente de Pareto - Cableado de Fibra\n\n";
-    int id = 1;
-    for (auto& s : paretoMST) {
-        cout << "Solucion " << id++ << ":\n";
-        cout << "  Distancia total = " << s.distanciaTotal << "\n";
-        cout << "  Tramo maximo    = " << s.tramoMaximo << "\n\n";
+    vector<SolucionCentrales> pareto;
+    for (auto& s : soluciones) {
+        bool dominada = false;
+        for (auto& p : pareto)
+            if (dominaCentrales(p, s))
+                dominada = true;
+        if (!dominada) pareto.push_back(s);
     }
 
-    /* =====================  2.2 TSP ===================== */
-
-    vector<SolucionTSP> tspCandidatas;
-
-    for (int eps = 15; eps <= 40; eps += 2) {
-        vector<bool> visitado(N, false);
-        vector<int> ruta = {0};
-        visitado[0] = true;
-
-        SolucionTSP mejor{INF, 0, {}};
-        backtrackingTSP(mat, eps, visitado, ruta, 1, 0, 0, mejor);
-
-        if (mejor.distanciaTotal < INF)
-            tspCandidatas.push_back(mejor);
-    }
-
-    auto tspUnicas = eliminarDuplicadosTSP(tspCandidatas);
-    auto paretoTSP = filtrarParetoTSP(tspUnicas);
-
-
-    cout << "Frente de Pareto - Ruta de Reparto\n\n";
-    id = 1;
-    for (auto& s : paretoTSP) {
-        cout << "Solucion " << id++ << ":\n";
-        cout << "  Distancia total = " << s.distanciaTotal << "\n";
-        cout << "  Salto maximo    = " << s.saltoMaximo << "\n";
-        cout << "  Ruta: ";
-        for (int v : s.ruta)
-            cout << char('A' + v) << " -> ";
-        cout << "A\n\n";
-    }
-
-    /* =====================  2.3 MAX FLOW ===================== */
-
-    int flujoMax = maxFlowEdmondsKarp(N, cap, 0, N - 1);
-
-    cout << "Flujo maximo de informacion\n";
-    cout << "  Nodo inicial: A\n";
-    cout << "  Nodo final:   " << char('A' + N - 1) << "\n";
-    cout << "  Flujo maximo: " << flujoMax << "\n";
+    cout << "\nFrente de Pareto - Centrales (promedio maximo)\n";
+    for (auto& s : pareto)
+        cout << s.distPromedio << " " << s.distMaxima << "\n";
 
     return 0;
 }

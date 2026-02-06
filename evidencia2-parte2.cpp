@@ -4,6 +4,7 @@
 #include <fstream>
 #include <queue>
 #include <limits>
+#include <cmath>
 
 using namespace std;
 
@@ -287,6 +288,82 @@ int maxFlowEdmondsKarp(
 }
 
 /* =========================================================
+   =====================  PARTE 2.4 ========================
+   ========  CENTRALES Y CERCANIA GEOGRAFICA  ==============
+   ========================================================= */
+
+struct Punto {
+    double x, y;
+};
+
+struct SolucionCentrales {
+    double distPromedio;
+    double distMaxima;
+    vector<int> centralesActivas;
+};
+
+double distanciaEuclidiana(const Punto& a, const Punto& b) {
+    double dx = a.x - b.x;
+    double dy = a.y - b.y;
+    return sqrt(dx * dx + dy * dy);
+}
+
+SolucionCentrales evaluarCentrales(
+    const vector<Punto>& colonias,
+    const vector<Punto>& centrales,
+    const vector<int>& activas
+) {
+    double suma = 0.0;
+    double maxDist = 0.0;
+
+    for (const auto& col : colonias) {
+        double mejor = 1e18;
+        for (int idx : activas) {
+            mejor = min(mejor, distanciaEuclidiana(col, centrales[idx]));
+        }
+        suma += mejor;
+        maxDist = max(maxDist, mejor);
+    }
+
+    return {
+        suma / colonias.size(),
+        maxDist,
+        activas
+    };
+}
+
+bool dominaCentrales(
+    const SolucionCentrales& a,
+    const SolucionCentrales& b
+) {
+    return (a.distPromedio <= b.distPromedio &&
+            a.distMaxima   <= b.distMaxima &&
+           (a.distPromedio <  b.distPromedio ||
+            a.distMaxima   <  b.distMaxima));
+}
+
+vector<SolucionCentrales> filtrarParetoCentrales(
+    vector<SolucionCentrales>& sols
+) {
+    vector<SolucionCentrales> pareto;
+
+    for (auto& s : sols) {
+        bool dominada = false;
+        for (auto& p : pareto) {
+            if (dominaCentrales(p, s)) {
+                dominada = true;
+                break;
+            }
+        }
+        if (!dominada)
+            pareto.push_back(s);
+    }
+    return pareto;
+}
+
+
+
+/* =========================================================
    ========================== MAIN =========================
    ========================================================= */
 
@@ -316,6 +393,7 @@ int main() {
 
     input.close();
 
+
     /* =====================  2.1 MST ===================== */
 
     vector<Edge> edges;
@@ -342,6 +420,7 @@ int main() {
         cout << "  Distancia total = " << s.distanciaTotal << "\n";
         cout << "  Tramo maximo    = " << s.tramoMaximo << "\n\n";
     }
+
 
     /* =====================  2.2 TSP ===================== */
 
@@ -375,6 +454,7 @@ int main() {
         cout << "A\n\n";
     }
 
+
     /* =====================  2.3 MAX FLOW ===================== */
 
     int flujoMax = maxFlowEdmondsKarp(N, cap, 0, N - 1);
@@ -384,5 +464,57 @@ int main() {
     cout << "  Nodo final:   " << char('A' + N - 1) << "\n";
     cout << "  Flujo maximo: " << flujoMax << "\n";
 
+
+    /* =====================  2.4 CENTRALES ===================== */
+
+    // Ejemplo: todas las colonias pueden ser candidatas a centrales
+    vector<Punto> colonias(N);
+    input.open("entrada.txt");
+    input >> N;
+
+    for (int i = 0; i < N; i++)
+        for (int j = 0; j < N; j++)
+            input >> mat[i][j];
+
+    for (int i = 0; i < N; i++)
+        for (int j = 0; j < N; j++)
+            input >> cap[i][j];
+
+    char cc;
+    for (int i = 0; i < N; i++) {
+        input >> cc >> colonias[i].x >> cc >> colonias[i].y >> cc;
+    }
+    input.close();
+
+    // Para esta fase, consideramos que cada colonia puede alojar una central
+    vector<Punto> centrales = colonias;
+
+    vector<SolucionCentrales> solucionesCentrales;
+    int M = centrales.size();
+
+    // Enumeración por subconjuntos (bitmask)
+    for (int mask = 1; mask < (1 << M); mask++) {
+        vector<int> activas;
+        for (int i = 0; i < M; i++)
+            if (mask & (1 << i))
+                activas.push_back(i);
+
+        solucionesCentrales.push_back(
+            evaluarCentrales(colonias, centrales, activas)
+        );
+    }
+
+    auto paretoCentrales = filtrarParetoCentrales(solucionesCentrales);
+    cout << "\nFrente de Pareto - Centrales y Cercania Geografica\n\n";
+    for (auto& s : paretoCentrales) {
+        cout << "Distancia promedio = " << s.distPromedio
+             << " | Distancia maxima = " << s.distMaxima
+             << " | Centrales: ";
+
+        for (int cidx : s.centralesActivas)
+            cout << char('A' + cidx) << " ";
+
+        cout << "\n";
+    }
     return 0;
 }
