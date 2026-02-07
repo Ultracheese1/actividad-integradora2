@@ -1,0 +1,8 @@
+Integrantes del equipo:
+
+Santiago Arista Viramontes - A01028372
+Diego Vergara Hernández - A01425660
+José Leobardo Navarro Márquez - A91541324
+
+Para esta entrega, todos los integrantes participamos en una reunión grupal para desarrollar la actividad.
+Link del repo: https://github.com/Ultracheese1/actividad-integradora2.git
