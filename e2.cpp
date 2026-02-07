@@ -74,7 +74,7 @@ vector<Point> readCentralCoordinates(ifstream& input, int N) {
     return centers;
 }
 
-/* ================= MST (PRIM) ================= */
+/* ================= 1. MST (PRIM) ================= */
 
 vector<int> computeMST(const vector<vector<int>>& dist) {
     int N = dist.size();
@@ -104,7 +104,7 @@ void printMST(const vector<int>& parent) {
              << char('A' + i) << ")\n";
 }
 
-/* ================= TSP ================= */
+/* ================= 2. TSP ================= */
 
 vector<int> computeTSPRoute(const vector<vector<int>>& dist) {
     int N = dist.size();
@@ -136,7 +136,7 @@ void printTSPRoute(const vector<int>& route) {
     cout << "\n";
 }
 
-/* ================= FLUJO MÁXIMO (DINIC) ================= */
+/* ================= 3. FLUJO MÁXIMO (DINIC) ================= */
 
 struct FlowEdge {
     int to, cap, rev;
@@ -205,7 +205,7 @@ int computeMaxFlow(const vector<vector<int>>& cap) {
     return d.maxFlow(0, N - 1);
 }
 
-/* ================= REGIONES ================= */
+/* ================= 4. REGIONES ================= */
 
 double distance(const Point& a, const Point& b) {
     return hypot(a.x - b.x, a.y - b.y);
@@ -250,8 +250,8 @@ void printRegions(const vector<vector<Point>>& regions) {
         cout << "]\n";
     }
 }
-
-/* ================= PASO 5: MULTIOBJETIVO ================= */
+/* ================= PARTE 2 ================= */
+/* ================= 1. Cableado ================= */
 
 vector<Solution> computeParetoCableado(const vector<vector<int>>& dist) {
     int N = dist.size();
@@ -344,7 +344,7 @@ void printPareto(const vector<Solution>& p) {
         cout << s.totalDist << "              " << s.maxEdge << "\n";
 }
 
-/* ================= PASO 6: TSP Variados ================= */
+/* ================= 2.Ruta de reparto físico ================= */
 
 TSPSolution buildTSPSolution(
     const vector<vector<int>>& dist,
@@ -450,7 +450,7 @@ void printParetoTSP(const vector<TSPSolution>& sols) {
     }
 }
 
-/* ================= PASO 7: flujo maximo ================= */
+/* ================= 3. Flujo de información ================= */
 
 vector<NetworkSolution> computeParetoNetwork(
     const vector<vector<int>>& dist,
@@ -466,7 +466,7 @@ vector<NetworkSolution> computeParetoNetwork(
         sols.push_back({s.totalDist, s.maxEdge, flow});
     }
 
-    // eliminar dominadas (ojo: flujo se maximiza)
+    // eliminar dominadas (flujo se maximiza)
     vector<NetworkSolution> pareto;
 
     for (int i = 0; i < sols.size(); i++) {
@@ -506,7 +506,7 @@ void printParetoNetwork(const vector<NetworkSolution>& sols) {
              << s.flow << "\n";
 }
 
-/* ================= PASO 8: region solution ================= */
+/* ================= 4. Centrales y cercanía geográfica ================= */
 
 RegionSolution evaluateAssignment(
     const vector<Point>& colonies,
