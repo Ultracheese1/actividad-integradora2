@@ -35,6 +35,13 @@ struct NetworkSolution {
     int flow;
 };
 
+struct RegionSolution {
+    double avgDist;
+    double maxDist;
+    vector<int> assignment; // colonia -> central
+};
+
+
 /* ================= LECTURA ================= */
 
 vector<vector<int>> readDistanceMatrix(ifstream& input, int& N) {
@@ -499,6 +506,95 @@ void printParetoNetwork(const vector<NetworkSolution>& sols) {
              << s.flow << "\n";
 }
 
+/* ================= PASO 8: region solution ================= */
+
+RegionSolution evaluateAssignment(
+    const vector<Point>& colonies,
+    const vector<Point>& centers,
+    const vector<int>& activeCenters
+) {
+    int N = colonies.size();
+    vector<int> assign(N);
+
+    double sum = 0.0;
+    double mx = 0.0;
+
+    for (int i = 0; i < N; i++) {
+        int best = activeCenters[0];
+        double bestD = distance(colonies[i], centers[best]);
+
+        for (int c : activeCenters) {
+            double d = distance(colonies[i], centers[c]);
+            if (d < bestD) {
+                bestD = d;
+                best = c;
+            }
+        }
+
+        assign[i] = best;
+        sum += bestD;
+        mx = max(mx, bestD);
+    }
+
+    return {sum / N, mx, assign};
+}
+
+vector<RegionSolution> computeRegionSolutions(
+    const vector<Point>& colonies,
+    const vector<Point>& centers
+) {
+    int M = centers.size();
+    vector<RegionSolution> sols;
+
+    // probar cada central individual
+    for (int i = 0; i < M; i++) {
+        sols.push_back(
+            evaluateAssignment(colonies, centers, {i})
+        );
+    }
+
+    // probar pares de centrales
+    for (int i = 0; i < M; i++)
+        for (int j = i + 1; j < M; j++)
+            sols.push_back(
+                evaluateAssignment(colonies, centers, {i, j})
+            );
+
+    return sols;
+}
+
+vector<RegionSolution> computeParetoRegions(
+    const vector<RegionSolution>& sols
+) {
+    vector<RegionSolution> pareto;
+
+    for (int i = 0; i < sols.size(); i++) {
+        bool dominated = false;
+        for (int j = 0; j < sols.size(); j++) {
+            if (i == j) continue;
+
+            if (sols[j].avgDist <= sols[i].avgDist &&
+                sols[j].maxDist <= sols[i].maxDist &&
+               (sols[j].avgDist < sols[i].avgDist ||
+                sols[j].maxDist < sols[i].maxDist)) {
+                dominated = true;
+                break;
+            }
+        }
+        if (!dominated)
+            pareto.push_back(sols[i]);
+    }
+
+    return pareto;
+}
+
+void printParetoRegions(const vector<RegionSolution>& sols) {
+    cout << "\nFrente de Pareto (Regiones de influencia):\n";
+    cout << "DistanciaPromedio  DistanciaMaxima\n";
+    for (auto& s : sols)
+        cout << s.avgDist << "               " << s.maxDist << "\n";
+}
+
 /* ================= MAIN ================= */
 
 int main() {
@@ -530,6 +626,10 @@ int main() {
 
     auto paretoNetwork = computeParetoNetwork(dist, cap);
     printParetoNetwork(paretoNetwork);
+
+    auto regionSols = computeRegionSolutions(centers, centers);
+    auto paretoRegions = computeParetoRegions(regionSols);
+    printParetoRegions(paretoRegions);
 
     input.close();
     return 0;
