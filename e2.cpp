@@ -29,6 +29,12 @@ struct TSPSolution {
     int maxEdge;
 };
 
+struct NetworkSolution {
+    int totalDist;
+    int maxEdge;
+    int flow;
+};
+
 /* ================= LECTURA ================= */
 
 vector<vector<int>> readDistanceMatrix(ifstream& input, int& N) {
@@ -437,6 +443,62 @@ void printParetoTSP(const vector<TSPSolution>& sols) {
     }
 }
 
+/* ================= PASO 7: flujo maximo ================= */
+
+vector<NetworkSolution> computeParetoNetwork(
+    const vector<vector<int>>& dist,
+    const vector<vector<int>>& cap
+) {
+    auto cablePareto = computeParetoCableado(dist);
+    cablePareto = removeDuplicateSolutions(cablePareto);
+
+    vector<NetworkSolution> sols;
+
+    for (auto& s : cablePareto) {
+        int flow = computeMaxFlow(cap);
+        sols.push_back({s.totalDist, s.maxEdge, flow});
+    }
+
+    // eliminar dominadas (ojo: flujo se maximiza)
+    vector<NetworkSolution> pareto;
+
+    for (int i = 0; i < sols.size(); i++) {
+        bool dominated = false;
+        for (int j = 0; j < sols.size(); j++) {
+            if (i == j) continue;
+
+            bool betterOrEqual =
+                sols[j].totalDist <= sols[i].totalDist &&
+                sols[j].maxEdge <= sols[i].maxEdge &&
+                sols[j].flow >= sols[i].flow;
+
+            bool strictlyBetter =
+                sols[j].totalDist < sols[i].totalDist ||
+                sols[j].maxEdge < sols[i].maxEdge ||
+                sols[j].flow > sols[i].flow;
+
+            if (betterOrEqual && strictlyBetter) {
+                dominated = true;
+                break;
+            }
+        }
+        if (!dominated)
+            pareto.push_back(sols[i]);
+    }
+
+    return pareto;
+}
+
+void printParetoNetwork(const vector<NetworkSolution>& sols) {
+    cout << "\nFrente de Pareto (Cableado + Flujo):\n";
+    cout << "DistanciaTotal  TramoMaximo  FlujoMaximo\n";
+
+    for (auto& s : sols)
+        cout << s.totalDist << "              "
+             << s.maxEdge << "            "
+             << s.flow << "\n";
+}
+
 /* ================= MAIN ================= */
 
 int main() {
@@ -465,6 +527,9 @@ int main() {
     auto paretoTSP = computeParetoTSP(dist);
     paretoTSP = removeDuplicateTSP(paretoTSP);
     printParetoTSP(paretoTSP);
+
+    auto paretoNetwork = computeParetoNetwork(dist, cap);
+    printParetoNetwork(paretoNetwork);
 
     input.close();
     return 0;
