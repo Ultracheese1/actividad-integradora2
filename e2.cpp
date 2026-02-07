@@ -595,6 +595,55 @@ void printParetoRegions(const vector<RegionSolution>& sols) {
         cout << s.avgDist << "               " << s.maxDist << "\n";
 }
 
+/* ================= visualización  ================= */
+
+void exportParetoCableadoCSV(
+    const vector<Solution>& pareto,
+    const string& filename
+) {
+    ofstream out(filename);
+    out << "DistanciaTotal,TramoMaximo\n";
+    for (auto& s : pareto)
+        out << s.totalDist << "," << s.maxEdge << "\n";
+    out.close();
+}
+
+void exportParetoTSPCSV(
+    const vector<TSPSolution>& pareto,
+    const string& filename
+) {
+    ofstream out(filename);
+    out << "DistanciaTotal,TramoMaximo\n";
+    for (auto& s : pareto)
+        out << s.totalDist << "," << s.maxEdge << "\n";
+    out.close();
+}
+
+void exportParetoNetworkCSV(
+    const vector<NetworkSolution>& pareto,
+    const string& filename
+) {
+    ofstream out(filename);
+    out << "DistanciaTotal,TramoMaximo,FlujoMaximo\n";
+    for (auto& s : pareto)
+        out << s.totalDist << ","
+            << s.maxEdge << ","
+            << s.flow << "\n";
+    out.close();
+}
+
+void exportParetoRegionsCSV(
+    const vector<RegionSolution>& pareto,
+    const string& filename
+) {
+    ofstream out(filename);
+    out << "DistanciaPromedio,DistanciaMaxima\n";
+    for (auto& s : pareto)
+        out << s.avgDist << "," << s.maxDist << "\n";
+    out.close();
+}
+
+
 /* ================= MAIN ================= */
 
 int main() {
@@ -630,6 +679,12 @@ int main() {
     auto regionSols = computeRegionSolutions(centers, centers);
     auto paretoRegions = computeParetoRegions(regionSols);
     printParetoRegions(paretoRegions);
+
+    exportParetoCableadoCSV(pareto, "pareto_cableado.csv");
+    exportParetoTSPCSV(paretoTSP, "pareto_tsp.csv");
+    exportParetoNetworkCSV(paretoNetwork, "pareto_network.csv");
+    exportParetoRegionsCSV(paretoRegions, "pareto_regions.csv");
+
 
     input.close();
     return 0;
