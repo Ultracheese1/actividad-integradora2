@@ -23,6 +23,12 @@ struct Solution {
     int maxEdge;
 };
 
+struct TSPSolution {
+    vector<int> route;
+    int totalDist;
+    int maxEdge;
+};
+
 /* ================= LECTURA ================= */
 
 vector<vector<int>> readDistanceMatrix(ifstream& input, int& N) {
@@ -325,6 +331,112 @@ void printPareto(const vector<Solution>& p) {
         cout << s.totalDist << "              " << s.maxEdge << "\n";
 }
 
+/* ================= PASO 6: TSP Variados ================= */
+
+TSPSolution buildTSPSolution(
+    const vector<vector<int>>& dist,
+    int start
+) {
+    int N = dist.size();
+    vector<bool> visited(N, false);
+    vector<int> route;
+
+    int cur = start;
+    visited[cur] = true;
+    route.push_back(cur);
+
+    int total = 0;
+    int mx = 0;
+
+    for (int step = 1; step < N; step++) {
+        int nxt = -1;
+        for (int v = 0; v < N; v++) {
+            if (!visited[v] &&
+               (nxt == -1 || dist[cur][v] < dist[cur][nxt])) {
+                nxt = v;
+            }
+        }
+        visited[nxt] = true;
+        route.push_back(nxt);
+        total += dist[cur][nxt];
+        mx = max(mx, dist[cur][nxt]);
+        cur = nxt;
+    }
+
+    // regresar al origen
+    total += dist[cur][start];
+    mx = max(mx, dist[cur][start]);
+    route.push_back(start);
+
+    return {route, total, mx};
+}
+
+vector<TSPSolution> computeParetoTSP(
+    const vector<vector<int>>& dist
+) {
+    int N = dist.size();
+    vector<TSPSolution> sols;
+
+    // generar rutas iniciando desde cada colonia
+    for (int s = 0; s < N; s++)
+        sols.push_back(buildTSPSolution(dist, s));
+
+    // eliminar dominadas
+    vector<TSPSolution> pareto;
+    for (int i = 0; i < sols.size(); i++) {
+        bool dominated = false;
+        for (int j = 0; j < sols.size(); j++) {
+            if (j == i) continue;
+            if (sols[j].totalDist <= sols[i].totalDist &&
+                sols[j].maxEdge <= sols[i].maxEdge &&
+               (sols[j].totalDist < sols[i].totalDist ||
+                sols[j].maxEdge < sols[i].maxEdge)) {
+                dominated = true;
+                break;
+            }
+        }
+        if (!dominated)
+            pareto.push_back(sols[i]);
+    }
+
+    return pareto;
+}
+
+vector<TSPSolution> removeDuplicateTSP(
+    vector<TSPSolution>& sols
+) {
+    sort(sols.begin(), sols.end(),
+        [](const TSPSolution& a, const TSPSolution& b) {
+            if (a.totalDist != b.totalDist)
+                return a.totalDist < b.totalDist;
+            return a.maxEdge < b.maxEdge;
+        });
+
+    vector<TSPSolution> unique;
+    for (auto& s : sols) {
+        if (unique.empty() ||
+            unique.back().totalDist != s.totalDist ||
+            unique.back().maxEdge != s.maxEdge) {
+            unique.push_back(s);
+        }
+    }
+    return unique;
+}
+
+void printParetoTSP(const vector<TSPSolution>& sols) {
+    cout << "\nFrente de Pareto (Rutas de reparto):\n";
+    cout << "Ruta | DistanciaTotal | TramoMaximo\n";
+
+    for (const auto& s : sols) {
+        for (int i = 0; i < s.route.size(); i++) {
+            cout << char('A' + s.route[i]);
+            if (i + 1 < s.route.size()) cout << " -> ";
+        }
+        cout << " | " << s.totalDist
+             << " | " << s.maxEdge << "\n";
+    }
+}
+
 /* ================= MAIN ================= */
 
 int main() {
@@ -349,6 +461,10 @@ int main() {
     auto pareto = computeParetoCableado(dist);
     pareto = removeDuplicateSolutions(pareto);
     printPareto(pareto);
+
+    auto paretoTSP = computeParetoTSP(dist);
+    paretoTSP = removeDuplicateTSP(paretoTSP);
+    printParetoTSP(paretoTSP);
 
     input.close();
     return 0;
